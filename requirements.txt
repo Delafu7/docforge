@@ -1,0 +1,7 @@
+fastapi==0.115.6
+uvicorn==0.32.1
+python-multipart==0.0.20
+markdownify==0.14.1
+markdown==3.7
+weasyprint==63.1
+pymupdf4llm==0.0.17

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Document Converter</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<h1>Document Converter</h1>
+
+<section class="card">
+  <h2>HTML &rarr; Markdown</h2>
+  <form data-endpoint="/convert/html-to-md">
+    <input type="file" name="file" accept=".html,.htm" required>
+    <button type="submit">Convert</button>
+    <span class="status"></span>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Markdown &rarr; PDF</h2>
+  <form data-endpoint="/convert/md-to-pdf">
+    <input type="file" name="file" accept=".md,.markdown" required>
+    <button type="submit">Convert</button>
+    <span class="status"></span>
+  </form>
+</section>
+
+<section class="card">
+  <h2>PDF &rarr; Markdown</h2>
+  <form data-endpoint="/convert/pdf-to-md">
+    <input type="file" name="file" accept=".pdf" required>
+    <button type="submit">Convert</button>
+    <span class="status"></span>
+  </form>
+</section>
+
+<script src="/app.js"></script>
+</body>
+</html>

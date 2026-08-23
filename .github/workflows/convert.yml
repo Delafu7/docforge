@@ -1,0 +1,79 @@
+name: Convert Document
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_path:
+        description: "Path to the file to convert"
+        required: true
+        type: string
+      conversion:
+        description: "Conversion to perform"
+        required: true
+        type: choice
+        options:
+          - html-to-md
+          - md-to-pdf
+          - pdf-to-md
+      output_dir:
+        description: "Directory to write the converted file into"
+        required: true
+        type: string
+        default: output
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t doc-converter .
+
+      - name: Start container
+        run: docker run -d -p 8000:8000 --name doc-converter doc-converter
+
+      - name: Wait for service to be ready
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "Service is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Service did not become ready within 60 seconds"
+          exit 1
+
+      - name: Convert file
+        run: |
+          mkdir -p "${{ inputs.output_dir }}"
+
+          http_code=$(curl -s -w "%{http_code}" -D headers.out -o response.out \
+            -F "file=@${{ inputs.source_path }}" \
+            "http://localhost:8000/convert/${{ inputs.conversion }}")
+
+          if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
+            echo "::error::Conversion failed with HTTP $http_code"
+            cat response.out
+            exit 1
+          fi
+
+          filename=$(grep -i '^content-disposition:' headers.out | sed -E 's/.*filename="?([^"]+)"?.*/\1/' | tr -d '\r')
+          if [[ -z "$filename" ]]; then
+            filename="converted.out"
+          fi
+
+          mv response.out "${{ inputs.output_dir }}/$filename"
+          echo "Wrote ${{ inputs.output_dir }}/$filename"
+
+      - name: Upload converted file
+        uses: actions/upload-artifact@v4
+        with:
+          name: converted-output
+          path: ${{ inputs.output_dir }}
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f doc-converter
