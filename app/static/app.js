@@ -2,7 +2,7 @@ document.querySelectorAll("form[data-endpoint]").forEach((form) => {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const status = form.querySelector(".status");
-    const fileInput = form.querySelector("input[type=file]");
+    const fileInput = form.querySelector("input[name=file]");
     status.classList.remove("error");
     status.textContent = "";
 
@@ -12,6 +12,14 @@ document.querySelectorAll("form[data-endpoint]").forEach((form) => {
 
     const formData = new FormData();
     formData.append("file", fileInput.files[0]);
+
+    const imagesInput = form.querySelector("input[name=images]");
+    if (imagesInput) {
+      Array.from(imagesInput.files).forEach((imageFile) => {
+        formData.append("images", imageFile);
+        formData.append("image_paths", imageFile.webkitRelativePath || imageFile.name);
+      });
+    }
 
     form.querySelectorAll("input[type=text], input[type=checkbox]").forEach((input) => {
       if (input.type === "checkbox") {
@@ -39,6 +47,7 @@ document.querySelectorAll("form[data-endpoint]").forEach((form) => {
       const disposition = response.headers.get("Content-Disposition") || "";
       const match = disposition.match(/filename="?([^"]+)"?/);
       const filename = match ? match[1] : "download";
+      const reportHeader = response.headers.get("X-Conversion-Report");
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -50,10 +59,27 @@ document.querySelectorAll("form[data-endpoint]").forEach((form) => {
       link.remove();
       URL.revokeObjectURL(url);
 
-      status.textContent = "Done";
+      const summary = _summarize(reportHeader);
+      status.textContent = summary ? `Done. ${summary}` : "Done";
     } catch (err) {
       status.classList.add("error");
       status.textContent = "Network error";
     }
   });
 });
+
+function _summarize(reportHeader) {
+  if (!reportHeader) {
+    return "";
+  }
+  try {
+    const report = JSON.parse(reportHeader);
+    return (
+      `${report.images_embedded} image(s) embedded ` +
+      `(${report.images_from_upload} from upload, ${report.images_downloaded} downloaded), ` +
+      `${report.images_skipped.length} skipped.`
+    );
+  } catch (err) {
+    return "";
+  }
+}

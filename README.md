@@ -57,21 +57,35 @@ file, so images referenced by the HTML can be embedded alongside the Markdown.
 
 ```bash
 curl -F "file=@tests/fixtures/sample.html" \
+  -F "images=@assets/logo.png" \
+  -F "image_paths=assets/logo.png" \
   -F "base_url=https://example.com/" \
-  -F "download_images=true" \
+  -F "allow_remote_download=false" \
   http://localhost:8000/convert/html-to-md -OJ
 # writes sample.zip
 ```
 
-Form fields (both optional):
+Form fields:
 
-- `base_url` — string, default empty. Used to resolve relative `src` / `href`
-  values on images. Relative image URLs are skipped if `base_url` is not set.
-- `download_images` — bool, default `true`. When `false`, no network calls are
-  made and every `src` is left untouched.
+- `images` — repeated file field, zero or more local image files (optional).
+  Typically the contents of an assets folder sitting next to the HTML file —
+  e.g. what a GitHub Actions checkout already has on disk. Uploading images
+  this way avoids a network round-trip and works for private or relative
+  paths that a remote download could never reach.
+- `image_paths` — repeated string field, optional, one entry per file in
+  `images`, giving that file's path relative to the HTML document (e.g.
+  `assets/logo.png`). When omitted for an entry, that upload's own filename
+  is used instead.
+- `base_url` — string, default empty. Used to resolve relative `src` values
+  against a remote host when remote download is allowed.
+- `allow_remote_download` — bool, **default `false`**. Downloading images
+  over the network is opt-in: with no uploads and this flag unset, the
+  endpoint never makes an HTTP call.
 
 The response is `application/zip` with `Content-Disposition: attachment;
-filename="<stem>.zip"`. Unzipped, the archive contains one top-level folder:
+filename="<stem>.zip"`, and an `X-Conversion-Report` header carrying the same
+JSON as `conversion-report.json` (handy for a UI to show a summary without
+unzipping the response). Unzipped, the archive contains one top-level folder:
 
 ```
 converted/
@@ -83,22 +97,65 @@ converted/
 `conversion-report.json` records what happened to each image:
 
 ```json
-{"images_embedded": 4, "images_skipped": [{"src": "...", "reason": "timeout"}], "warnings": []}
+{
+  "images_embedded": 6,
+  "images_from_upload": 5,
+  "images_downloaded": 1,
+  "images_skipped": [{"src": "...", "reason": "no_local_match_remote_disabled"}],
+  "unused_uploads": ["assets/unused.png"],
+  "warnings": []
+}
 ```
 
-Image handling, per `<img>` tag, in order:
+- `images_embedded` — total images written to `assets/`, from any source.
+- `images_from_upload` — subset of those embedded from an `images` upload.
+- `images_downloaded` — subset of those embedded via a remote download.
+- `images_skipped` — `<img>` tags left untouched, with a reason.
+- `unused_uploads` — uploaded images no `<img>` tag referenced; not written
+  to `assets/`.
+- `warnings` — non-fatal notices, e.g. an ambiguous upload match.
+
+Image resolution, per `<img>` tag, first match wins:
 
 1. `data:` URI — decoded and written to `assets/`.
-2. Absolute `http(s)` URL — downloaded and written to `assets/`.
-3. Relative URL — resolved against `base_url` and downloaded; skipped if
-   `base_url` is empty.
+2. Local upload match (see matching rules below) — the uploaded bytes are
+   copied into `assets/`.
+3. Remote `http(s)` URL, or a relative URL resolvable against a non-empty
+   `base_url` — downloaded, **only if `allow_remote_download` is `true`**.
+4. Otherwise — the original `src` is left untouched, and the image is
+   recorded in `images_skipped` with reason `no_local_match_remote_disabled`.
 
-Limits (an image that exceeds one of these is skipped and recorded in the
-report; the request still returns `200`):
+Matching rules for step 2 (the `src` is normalized first: URL-decoded, query
+string and fragment stripped, a leading `./` dropped, separators normalized
+to `/`), tried in order:
+
+1. Exact match against a supplied `image_paths` value.
+2. Suffix match — the `src` ends with a supplied path, or a supplied path
+   ends with the `src` (handles e.g. `../assets/logo.png` vs `assets/logo.png`).
+3. Basename match against the upload's filename.
+4. Case-insensitive basename match.
+
+An ambiguous basename match (two uploads sharing a basename, with no path to
+disambiguate) resolves to the first matching upload and adds a `warnings`
+entry naming the `src`.
+
+Limits on uploads (an image that exceeds one of these fails the whole
+request):
+
+- max 100 uploaded images — `400` if exceeded
+- max 25 MB total across all uploads — `413` if exceeded
+- `image/*` content types only, verified by sniffing magic bytes (never the
+  client-supplied `Content-Type`) — `400` on a non-image upload
+- any `image_paths` value containing an absolute path, a drive letter, or a
+  `..` segment — `400`
+
+Limits on remote downloads (step 3 only; an image that exceeds one of these
+is skipped and recorded in the report, non-fatal — the request still returns
+`200`):
 
 - `http` / `https` schemes only
 - 10s timeout per image
-- max 50 images per document
+- max 50 remote downloads per document
 - max 25 MB downloaded in total
 - `image/*` content types only
 
@@ -132,7 +189,11 @@ See `.github/workflows/convert.yml` for a working reference. The pattern:
 6. `docker rm -f doc-converter` in an `if: always()` cleanup step.
 
 Trigger it manually via `workflow_dispatch`, supplying `source_path`, `conversion`
-(one of `html-to-md`, `md-to-pdf`, `pdf-to-md`), and `output_dir`.
+(one of `html-to-md`, `md-to-pdf`, `pdf-to-md`), and `output_dir`. For
+`html-to-md`, an optional `assets_dir` input uploads every file under that
+directory as a local image (with its path relative to `source_path`'s
+directory sent as `image_paths`), so images already on disk in the checkout
+are embedded without any network call.
 
 ## Tests
 

@@ -6,7 +6,7 @@ from io import BytesIO
 from bs4 import BeautifulSoup, Comment
 from markdownify import markdownify
 
-from app.converters.images import embed_images
+from app.converters.images import LocalImage, embed_images
 
 _HEADING_RE = re.compile(r"^h[1-6]$")
 _BLANK_LINES_RE = re.compile(r"\n{3,}")
@@ -14,13 +14,18 @@ _BLANK_LINES_RE = re.compile(r"\n{3,}")
 ARCHIVE_ROOT = "converted"
 
 
-def convert(html: bytes, base_url: str = "", download_images: bool = True) -> bytes:
+def convert(
+    html: bytes,
+    images: list[LocalImage] | None = None,
+    base_url: str = "",
+    allow_remote_download: bool = False,
+) -> bytes:
     soup = BeautifulSoup(html.decode("utf-8"), "html.parser")
 
     _strip_unwanted(soup)
     _clean_headings(soup)
 
-    report = embed_images(soup, base_url, download_images)
+    report = embed_images(soup, base_url, allow_remote_download, images or [])
 
     md = markdownify(str(soup), heading_style="ATX", bullets="-", code_language="")
     md = _normalize_markdown(md)

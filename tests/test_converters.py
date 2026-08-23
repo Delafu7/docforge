@@ -11,7 +11,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 def test_html_to_md_produces_valid_zip_bundle():
     html_bytes = (FIXTURES / "sample.html").read_bytes()
-    result = html_to_md(html_bytes, base_url="", download_images=False)
+    result = html_to_md(html_bytes)
     assert isinstance(result, bytes)
     assert len(result) > 0
 

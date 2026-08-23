@@ -20,6 +20,10 @@ on:
         required: true
         type: string
         default: output
+      assets_dir:
+        description: "Directory of local images to upload alongside an html-to-md conversion (optional)"
+        required: false
+        type: string
 
 jobs:
   convert:
@@ -50,8 +54,18 @@ jobs:
         run: |
           mkdir -p "${{ inputs.output_dir }}"
 
+          extra_args=()
+          if [[ "${{ inputs.conversion }}" == "html-to-md" && -n "${{ inputs.assets_dir }}" ]]; then
+            html_dir=$(dirname "${{ inputs.source_path }}")
+            while IFS= read -r -d '' image_file; do
+              rel_path=$(realpath --relative-to="$html_dir" "$image_file")
+              extra_args+=(-F "images=@${image_file}" -F "image_paths=${rel_path}")
+            done < <(find "${{ inputs.assets_dir }}" -type f -print0)
+          fi
+
           http_code=$(curl -s -w "%{http_code}" -D headers.out -o response.out \
             -F "file=@${{ inputs.source_path }}" \
+            "${extra_args[@]}" \
             "http://localhost:8000/convert/${{ inputs.conversion }}")
 
           if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then

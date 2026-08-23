@@ -10,12 +10,16 @@
 
 <section class="card">
   <h2>HTML &rarr; Markdown</h2>
-  <form data-endpoint="/convert/html-to-md">
+  <form data-endpoint="/convert/html-to-md" id="html-to-md-form">
     <input type="file" name="file" accept=".html,.htm" required>
+    <label>
+      Local images folder (optional)
+      <input type="file" name="images" id="images-input" multiple webkitdirectory>
+    </label>
     <input type="text" name="base_url" placeholder="Base URL (optional)">
     <label>
-      <input type="checkbox" name="download_images" checked>
-      Download images
+      <input type="checkbox" name="allow_remote_download">
+      Allow remote download (fetch images over the network)
     </label>
     <button type="submit">Convert</button>
     <span class="status"></span>
