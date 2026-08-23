@@ -1,3 +1,10 @@
+// When this page is served from a different origin than the backend - e.g.
+// published to GitHub Pages while the API runs on Fly.io/Render/a VPS/etc. -
+// set this to the backend's base URL (no trailing slash), and make sure the
+// backend's ALLOWED_ORIGINS includes this page's origin. Leave empty when
+// the backend serves this page itself (local dev, Docker).
+const API_BASE = "";
+
 document.querySelectorAll("form[data-endpoint]").forEach((form) => {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -32,7 +39,7 @@ document.querySelectorAll("form[data-endpoint]").forEach((form) => {
     status.textContent = "Converting...";
 
     try {
-      const response = await fetch(form.dataset.endpoint, {
+      const response = await fetch(API_BASE + form.dataset.endpoint, {
         method: "POST",
         body: formData,
       });

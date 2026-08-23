@@ -1,10 +1,12 @@
 import json
+import os
 import zipfile
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -24,6 +26,22 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI()
+
+# Cross-origin access is closed by default. Set ALLOWED_ORIGINS to a
+# comma-separated list (e.g. "https://<user>.github.io") to let a frontend
+# hosted elsewhere - such as this project's UI published to GitHub Pages,
+# see .github/workflows/pages.yml - call this API.
+_allowed_origins = [
+    origin.strip() for origin in os.environ.get("ALLOWED_ORIGINS", "").split(",") if origin.strip()
+]
+if _allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+        expose_headers=["Content-Disposition", "X-Conversion-Report"],
+    )
 
 
 @dataclass(frozen=True)

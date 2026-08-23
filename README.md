@@ -195,6 +195,34 @@ directory as a local image (with its path relative to `source_path`'s
 directory sent as `image_paths`), so images already on disk in the checkout
 are embedded without any network call.
 
+## Deploying the UI to GitHub Pages
+
+GitHub Pages only serves static files — it cannot run the FastAPI backend
+(Docker, WeasyPrint, PyMuPDF). So the split is: the backend runs on a real
+host you choose, and `app/static/` (the browser UI) is published to GitHub
+Pages and configured to call that backend's URL.
+
+1. **Deploy the backend somewhere that runs Docker containers** — e.g.
+   Fly.io, Render, Railway, or your own VPS — using the existing
+   `Dockerfile`. Whatever you pick, you get back a base URL like
+   `https://doc-converter.example.com`.
+2. **Allow the Pages origin to call it.** Set the backend's `ALLOWED_ORIGINS`
+   environment variable to your Pages URL, e.g.
+   `ALLOWED_ORIGINS=https://<user>.github.io` (comma-separate multiple
+   origins). Without this, the browser's CORS check blocks the request — the
+   API is closed to cross-origin calls by default.
+3. **Point the UI at the backend.** Edit the `API_BASE` constant near the top
+   of `app/static/app.js` to that same base URL (no trailing slash), commit,
+   and push to `main`.
+4. **Enable Pages once, in the repo's GitHub settings** — Settings → Pages →
+   Source → "GitHub Actions". After that, `.github/workflows/pages.yml`
+   publishes `app/static/` on every push to `main` that touches it (or via
+   `workflow_dispatch`).
+
+Local development and the Docker image are unaffected: when `API_BASE` is
+empty (its default) and `ALLOWED_ORIGINS` is unset, the UI keeps talking to
+whatever origin served it, same as before this split existed.
+
 ## Tests
 
 ```bash
