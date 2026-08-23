@@ -52,11 +52,55 @@ curl http://localhost:8000/health
 
 ### `POST /convert/html-to-md`
 
+Unlike the other two endpoints, this one returns a ZIP bundle rather than a single
+file, so images referenced by the HTML can be embedded alongside the Markdown.
+
 ```bash
 curl -F "file=@tests/fixtures/sample.html" \
+  -F "base_url=https://example.com/" \
+  -F "download_images=true" \
   http://localhost:8000/convert/html-to-md -OJ
-# writes sample.md
+# writes sample.zip
 ```
+
+Form fields (both optional):
+
+- `base_url` — string, default empty. Used to resolve relative `src` / `href`
+  values on images. Relative image URLs are skipped if `base_url` is not set.
+- `download_images` — bool, default `true`. When `false`, no network calls are
+  made and every `src` is left untouched.
+
+The response is `application/zip` with `Content-Disposition: attachment;
+filename="<stem>.zip"`. Unzipped, the archive contains one top-level folder:
+
+```
+converted/
+  converted.md
+  assets/                  # only present when at least one image was embedded
+  conversion-report.json
+```
+
+`conversion-report.json` records what happened to each image:
+
+```json
+{"images_embedded": 4, "images_skipped": [{"src": "...", "reason": "timeout"}], "warnings": []}
+```
+
+Image handling, per `<img>` tag, in order:
+
+1. `data:` URI — decoded and written to `assets/`.
+2. Absolute `http(s)` URL — downloaded and written to `assets/`.
+3. Relative URL — resolved against `base_url` and downloaded; skipped if
+   `base_url` is empty.
+
+Limits (an image that exceeds one of these is skipped and recorded in the
+report; the request still returns `200`):
+
+- `http` / `https` schemes only
+- 10s timeout per image
+- max 50 images per document
+- max 25 MB downloaded in total
+- `image/*` content types only
 
 ### `POST /convert/md-to-pdf`
 

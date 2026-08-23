@@ -12,6 +12,11 @@
   <h2>HTML &rarr; Markdown</h2>
   <form data-endpoint="/convert/html-to-md">
     <input type="file" name="file" accept=".html,.htm" required>
+    <input type="text" name="base_url" placeholder="Base URL (optional)">
+    <label>
+      <input type="checkbox" name="download_images" checked>
+      Download images
+    </label>
     <button type="submit">Convert</button>
     <span class="status"></span>
   </form>

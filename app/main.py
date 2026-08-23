@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -29,8 +29,8 @@ CONVERSIONS: dict[str, Conversion] = {
     "html-to-md": Conversion(
         extensions=(".html", ".htm"),
         mime_types=("text/html", "application/xhtml+xml"),
-        output_ext="md",
-        output_mime="text/markdown; charset=utf-8",
+        output_ext="zip",
+        output_mime="application/zip",
         convert=html_to_md,
     ),
     "md-to-pdf": Conversion(
@@ -104,7 +104,32 @@ def _make_route(name: str, conversion: Conversion):
 
 
 for _name, _conversion in CONVERSIONS.items():
+    if _name == "html-to-md":
+        continue
     app.post(f"/convert/{_name}")(_make_route(_name, _conversion))
+
+
+@app.post("/convert/html-to-md")
+async def convert_html_to_md(
+    file: UploadFile,
+    base_url: str = Form(""),
+    download_images: bool = Form(True),
+):
+    conversion = CONVERSIONS["html-to-md"]
+    stem = _validate(conversion, file)
+    data = await _read_upload(file)
+
+    try:
+        result = html_to_md(data, base_url, download_images)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Conversion failed: {exc}") from exc
+
+    filename = f"{stem}.zip"
+    return Response(
+        content=result,
+        media_type=conversion.output_mime,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/health")

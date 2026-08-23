@@ -13,6 +13,14 @@ document.querySelectorAll("form[data-endpoint]").forEach((form) => {
     const formData = new FormData();
     formData.append("file", fileInput.files[0]);
 
+    form.querySelectorAll("input[type=text], input[type=checkbox]").forEach((input) => {
+      if (input.type === "checkbox") {
+        formData.append(input.name, input.checked);
+      } else if (input.value) {
+        formData.append(input.name, input.value);
+      }
+    });
+
     status.textContent = "Converting...";
 
     try {

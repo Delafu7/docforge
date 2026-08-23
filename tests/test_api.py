@@ -22,14 +22,23 @@ def test_root_serves_ui():
 
 
 def test_html_to_md_success():
+    import zipfile
+    from io import BytesIO
+
     data = (FIXTURES / "sample.html").read_bytes()
     response = client.post(
         "/convert/html-to-md",
         files={"file": ("sample.html", data, "text/html")},
+        data={"download_images": "false"},
     )
     assert response.status_code == 200
-    assert response.headers["content-disposition"] == 'attachment; filename="sample.md"'
-    assert b"Hello World" in response.content
+    assert response.headers["content-disposition"] == 'attachment; filename="sample.zip"'
+    assert response.headers["content-type"] == "application/zip"
+
+    zf = zipfile.ZipFile(BytesIO(response.content))
+    md = zf.read("converted/converted.md").decode("utf-8")
+    assert "Hello World" in md
+    assert "converted/conversion-report.json" in zf.namelist()
 
 
 def test_md_to_pdf_success():

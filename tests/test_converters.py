@@ -1,3 +1,5 @@
+import zipfile
+from io import BytesIO
 from pathlib import Path
 
 from app.converters.html_to_md import convert as html_to_md
@@ -7,12 +9,14 @@ from app.converters.pdf_to_md import convert as pdf_to_md
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def test_html_to_md_produces_valid_utf8_markdown():
+def test_html_to_md_produces_valid_zip_bundle():
     html_bytes = (FIXTURES / "sample.html").read_bytes()
-    result = html_to_md(html_bytes)
+    result = html_to_md(html_bytes, base_url="", download_images=False)
     assert isinstance(result, bytes)
     assert len(result) > 0
-    text = result.decode("utf-8")
+
+    zf = zipfile.ZipFile(BytesIO(result))
+    text = zf.read("converted/converted.md").decode("utf-8")
     assert "Hello World" in text
     assert "sample" in text
 

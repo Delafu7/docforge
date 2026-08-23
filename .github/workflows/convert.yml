@@ -68,6 +68,11 @@ jobs:
           mv response.out "${{ inputs.output_dir }}/$filename"
           echo "Wrote ${{ inputs.output_dir }}/$filename"
 
+          if [[ "${{ inputs.conversion }}" == "html-to-md" ]]; then
+            unzip -o "${{ inputs.output_dir }}/$filename" -d "${{ inputs.output_dir }}"
+            rm "${{ inputs.output_dir }}/$filename"
+          fi
+
       - name: Upload converted file
         uses: actions/upload-artifact@v4
         with:
