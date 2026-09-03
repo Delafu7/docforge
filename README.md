@@ -8,6 +8,9 @@ are exposed over HTTP:
 - `POST /convert/pdf-to-md` — `.pdf` → `.md`
 
 Plus `GET /health` for readiness checks and `GET /` for a minimal browser UI.
+For a local, offline workflow there is also an interactive terminal menu
+(`python -m app.tui`, see below) that runs the same conversions without the
+HTTP server.
 
 The service is ephemeral: it is meant to be built, started, used for one or more
 conversions, and torn down — no database, no auth, no persistence.
@@ -40,6 +43,38 @@ docker run -d -p 8000:8000 --name doc-converter doc-converter
 curl http://localhost:8000/health
 docker rm -f doc-converter
 ```
+
+## Terminal menu (TUI)
+
+For a quick local conversion without starting the HTTP server, launch the
+interactive menu:
+
+```bash
+pip install -r requirements.txt
+python -m app.tui
+```
+
+It calls the same `app.converters.*` functions the API uses — no server, no
+network (except the optional remote-image download and the health check).
+
+```
+DocForge
+ » Convert HTML to Markdown
+   Convert Markdown to PDF
+   Convert PDF to Markdown
+   Check service health
+   Exit
+```
+
+- Navigate with the arrow keys and `Enter`. When stdin/stdout is not a TTY
+  (piped or redirected), it falls back to a numbered plain-text menu.
+- Each option prompts for the input file, any flags (HTML-to-Markdown asks
+  about `sanitize` and remote image download), and the output path. Invalid
+  input is reported and re-prompted; a blank answer cancels back to the menu.
+- An existing output file must be confirmed before it is overwritten.
+- "Check service health" sends `GET /health` to a running instance (default
+  `http://localhost:8000`).
+- `Ctrl+C`, `Ctrl+D`, and the "Exit" entry all quit with exit code 0.
 
 ## Endpoints
 
